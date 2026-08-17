@@ -1,13 +1,18 @@
 [project]
 name = "imdb-dataset"
 version = "0.1.0"
-description = "Curated IMDb dataset, SQLite DB, and compact JSON CDN pipeline"
+description = "Curated IMDb dataset (1900–present), SQLite DB, and CORS-enabled JSON CDN endpoints updated weekly"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "httpx[http2]>=0.28.0",
     "msgspec>=0.19.0",
 ]
+
+[project.urls]
+"Live Dataset" = "https://quantavil.github.io/imdb-dataset/titles.json.gz"
+Repository = "https://github.com/quantavil/imdb-dataset"
+
 
 [build-system]
 requires = ["setuptools>=61.0"]

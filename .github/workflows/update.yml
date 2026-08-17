@@ -1,0 +1,83 @@
+name: Weekly IMDb Dataset Refresh & Tuesday Retry
+
+on:
+  # Triggers on Monday and Tuesday ONLY at 09:42 UTC (0 triggers Wed-Sun)
+  schedule:
+    - cron: '42 9 * * 1,2'
+  # Allows manual triggering anytime from GitHub UI
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force full run even if dataset was already updated'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-dataset:
+    name: Ingest, Enrich & Export
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras --frozen
+
+      - name: Run test suite
+        run: uv run pytest
+
+      - name: Fetch existing release for freshness check
+        run: |
+          mkdir -p data
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/latest/titles.json" -o data/titles.json || true
+
+      - name: Check dataset freshness (Skip Tuesday if Monday succeeded)
+        id: freshness
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "Force run requested."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif uv run src/check_freshness.py; then
+            echo "Dataset needs refresh. Proceeding."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "Dataset was already updated on Monday (< 5 days old). Skipping Tuesday run."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stream & Ingest official IMDb datasets
+        if: steps.freshness.outputs.should_run == 'true'
+        run: uv run src/ingest.py
+
+      - name: Enrich top titles with posters, cast & popularity
+        if: steps.freshness.outputs.should_run == 'true'
+        run: uv run src/enrich.py --limit 2000
+
+      - name: Export compact JSON
+        if: steps.freshness.outputs.should_run == 'true'
+        run: uv run src/export.py
+
+      - name: Publish dataset to GitHub Release
+        if: steps.freshness.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Publishing fresh dataset assets to 'latest' GitHub Release..."
+          gh release upload latest imdb.db data/titles.json data/titles.json.gz --clobber || \
+          gh release create latest imdb.db data/titles.json data/titles.json.gz \
+            --title "Latest IMDb Dataset" \
+            --notes "Weekly automated refresh from official IMDb public datasets."

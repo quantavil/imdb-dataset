@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest & testing artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Large Raw Datasets & Local Caches (Exceeds GitHub 100MB Limit)
+*.tsv.gz
+*.tsv
+data/raw/
+cache/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# SQLite Databases & WAL locks (Database distributed via GitHub Releases)
+imdb.db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*test*.db
+
+# Exported Dataset Outputs (Distributed via GitHub Releases)
+data/
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

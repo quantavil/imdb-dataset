@@ -452,7 +452,7 @@ def test_local_file_ingestion(temp_db, tmp_path):
 
 
 def test_basics_filters_year_adult_and_type(temp_db, tmp_path):
-    """Reject pre-1990, adult, and disallowed title types even when votes qualify."""
+    """Reject pre-1900, adult, and disallowed title types even when votes qualify."""
     ratings_gz = tmp_path / "title.ratings.tsv.gz"
     ratings_content = (
         "tconst\taverageRating\tnumVotes\n"
@@ -468,7 +468,7 @@ def test_basics_filters_year_adult_and_type(temp_db, tmp_path):
     basics_content = (
         "tconst\ttitleType\tprimaryTitle\toriginalTitle\tisAdult\tstartYear\tendYear\truntimeMinutes\tgenres\n"
         "ttkeep1\tmovie\tKeeper\tKeeper\t0\t2020\t\\N\t100\tDrama\n"
-        "ttold01\tmovie\tClassic\tClassic\t0\t1985\t\\N\t100\tDrama\n"
+        "ttold01\tmovie\tClassic\tClassic\t0\t1895\t\\N\t100\tDrama\n"
         "ttadlt1\tmovie\tAdult\tAdult\t1\t2020\t\\N\t100\tDrama\n"
         "ttgame1\tvideoGame\tGame\tGame\t0\t2020\t\\N\t100\tAction\n"
     )

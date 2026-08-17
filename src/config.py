@@ -24,7 +24,7 @@ FILTER_CONFIG = {
     "min_votes": 1000,
     "min_rating": 1.0,
     "max_rating": 10.0,
-    "min_year": 1990,
+    "min_year": 1900,
     "allowed_types": {
         "movie": "movie",
         "tvSeries": "tv_series",

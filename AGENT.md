@@ -2,7 +2,7 @@
 
 ## Critical Blunders & Learnings
 - **IMDb Search Scraping (AWS WAF)**: Direct scraping hits AWS WAF (202/Captcha). Fix: Stream official daily dumps from `datasets.imdbws.com`.
-- **GitHub 100MB File Limit**: Raw `.tsv.gz` and unfiltered DBs exceed Git limits. Fix: Stream/filter in memory (`min_votes >= 1000`), keeping DB at ~26MB.
+- **GitHub 100MB File Limit**: Raw `.tsv.gz` and unfiltered DBs exceed Git limits. Fix: Stream/filter in memory (`min_votes >= 1000`, `min_year >= 1900`), keeping DB at ~31.6MB.
 - **Popularity Source**: Official TSVs lack live traffic ranks. Fix: Extract live MOVIEMETER rank (`item["rank"]`) from IMDb Suggestion CDN.
 - **Stale Popularity vs COALESCE**: `popularity_rank` must update directly (`popularity_rank = ?`) to clear unranked titles, while static poster/cast preserve values via `COALESCE`.
 - **Enrichment Failed ID Filtering**: Exclude failed IDs in-memory in Python to prevent both infinite `--all` loops and SQLite variable limit overflows.
@@ -14,15 +14,15 @@
 ## Project Structure
 - `.github/workflows/update.yml`: Monday run & Tuesday retry cron workflow (`42 9 * * 1,2`).
 - `pyproject.toml` & `uv.lock`: Modern packaging with `uv`, console scripts (`imdb-*`), dependencies (`httpx[http2]`, `msgspec`), and dev tools (`pytest`, `ruff`, `mypy`).
-- `src/config.py`: Ingestion thresholds (`min_votes: 1000`), dataset URLs, enrichment settings.
+- `src/config.py`: Ingestion thresholds (`min_votes: 1000`, `min_year: 1900`), dataset URLs, enrichment settings.
 - `src/db.py`: SQLite schema, indexes, dynamic migrations, batch upserts, rank calculation, and connection manager.
 - `src/ingest.py`: Zero-disk streaming filter for ratings, basics, episodes, and crew.
 - `src/enrich.py`: Multithreaded HTTP/2 worker (`httpx` + `msgspec`) fetching HD posters, top cast, and MOVIEMETER popularity with 7-day TTL.
 - `src/export.py`: Atomic exporter (`msgspec.json.encode`) generating compact columnar JSON (`data/titles.json`) and gzip (`data/titles.json.gz`).
 - `src/check_freshness.py`: Freshness checker detecting stale dataset for Tuesday retry.
 - `tests/test_pipeline.py`: Automated unit & regression test suite covering all pipeline components.
-- `data/`: Generated JSON dataset (`titles.json`, 15.18 MB; `titles.json.gz`, 4.30 MB, git-ignored, distributed via GitHub Releases).
-- `imdb.db`: SQLite database holding 88,363 indexed titles (~26 MB, git-ignored, distributed via GitHub Releases).
+- `data/`: Generated JSON dataset (`titles.json`, 16.88 MB; `titles.json.gz`, 4.53 MB, git-ignored, distributed via GitHub Releases).
+- `imdb.db`: SQLite database holding 103,229 indexed titles (~31.6 MB, git-ignored, distributed via GitHub Releases).
 - `cache/`: Optional local `.tsv.gz` dumps (git-ignored).
 
 ## Execution Workflow

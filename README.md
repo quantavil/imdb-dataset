@@ -15,9 +15,9 @@ The following links are **static and permanent**. They are automatically overwri
 
 | Asset | Format | Size | Description | Download Link |
 | :--- | :--- | :--- | :--- | :--- |
-| **`titles.json.gz`** | Compressed JSON | **~4.3 MB** | **Recommended for Web & APIs.** Pre-compressed compact columnar format. | [Download `titles.json.gz`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz) |
-| **`titles.json`** | Raw JSON | **~15.2 MB** | Uncompressed columnar JSON dataset for instant browser parsing. | [Download `titles.json`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json) |
-| **`imdb.db`** | SQLite 3 | **~26.0 MB** | Fully indexed relational database with pre-computed rankings. | [Download `imdb.db`](https://github.com/quantavil/imdb-dataset/releases/download/latest/imdb.db) |
+| **`titles.json.gz`** | Compressed JSON | **~4.5 MB** | **Recommended for Web & APIs.** Pre-compressed compact columnar format. | [Download `titles.json.gz`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz) |
+| **`titles.json`** | Raw JSON | **~16.9 MB** | Uncompressed columnar JSON dataset for instant browser parsing. | [Download `titles.json`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json) |
+| **`imdb.db`** | SQLite 3 | **~31.6 MB** | Fully indexed relational database with pre-computed rankings. | [Download `imdb.db`](https://github.com/quantavil/imdb-dataset/releases/download/latest/imdb.db) |
 
 > [!TIP]
 > **Production Recommendation:** Use `titles.json.gz` in web applications. Modern browsers decompress it transparently in under 30ms with minimal bandwidth consumption.
@@ -93,23 +93,23 @@ for row in cursor.fetchall():
 
 ## 📊 Dataset Specifications & Schema
 
-* **Curated Universe:** 88,000+ titles filtered to $\ge 1,000$ votes and release year $\ge 1990$.
-* **Breakdown:** ~37,000 Movies, ~11,700 TV Series/Miniseries, ~35,600 TV Episodes, and ~13,100 Animation titles.
+* **Curated Universe:** 103,000+ titles filtered to $\ge 1,000$ votes and release year $\ge 1900$.
+* **Breakdown:** ~48,900 Movies, ~12,800 TV Series/Miniseries, ~36,300 TV Episodes, and ~14,200 Animation titles.
 * **Deterministic Rank Order:** Sorted by `rating DESC`, `vote_count DESC`, `imdb_id ASC`.
 
 ### JSON Columnar Layout (`titles.json`)
 
-To eliminate key repetition over 88,000 records, titles are exported in a compact array-of-arrays structure:
+To eliminate key repetition over 103,000 records, titles are exported in a compact array-of-arrays structure:
 
 ```json
 {
   "stats": {
-    "total_titles": 88363,
-    "total_movies": 37076,
-    "total_tv": 11766,
-    "total_episodes": 35666,
-    "total_animation": 13193,
-    "avg_rating": 7.04,
+    "total_titles": 103229,
+    "total_movies": 48937,
+    "total_tv": 12792,
+    "total_episodes": 36337,
+    "total_animation": 14228,
+    "avg_rating": 6.99,
     "min_votes": 1000,
     "last_updated": "2026-08-17"
   },
@@ -118,7 +118,7 @@ To eliminate key repetition over 88,000 records, titles are exported in a compac
     "rating", "votes", "runtime", "genres", "is_adult", "is_animation",
     "poster", "cast", "popularity", "rank", "directors", "parent_id", "season", "episode"
   ],
-  "total": 88363,
+  "total": 103229,
   "data": [
     ["tt4283088", "Battle of the Bastards", "Battle of the Bastards", "tv_episode", 2016, null, 9.9, 312717, 60, "Drama, Fantasy", 0, 0, "https://...", "Kit Harington, Emilia Clarke", 25, 1, "nm0764527", "tt0944947", 6, 9]
   ]

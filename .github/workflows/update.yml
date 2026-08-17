@@ -81,3 +81,13 @@ jobs:
           gh release create latest imdb.db data/titles.json data/titles.json.gz \
             --title "Latest IMDb Dataset" \
             --notes "Weekly automated refresh from official IMDb public datasets."
+
+      - name: Deploy dataset to GitHub Pages (gh-pages branch)
+        if: steps.freshness.outputs.should_run == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./data
+          publish_branch: gh-pages
+          force_orphan: true
+

@@ -12,7 +12,7 @@
 - **Index Migration Rebuild**: `CREATE INDEX IF NOT EXISTS` leaves old definitions unchanged. Fix: Explicitly `DROP INDEX IF EXISTS idx_titles_rating_votes` in `init_db` before creating the 3-column index.
 
 ## Project Structure
-- `.github/workflows/update.yml`: Monday run & Tuesday retry cron workflow (`42 9 * * 1,2`).
+- `.github/workflows/update.yml`: Monday run & Tuesday retry cron workflow (`42 9 * * 1,2`) publishing to GitHub Releases and deploying to GitHub Pages (`gh-pages`).
 - `pyproject.toml` & `uv.lock`: Modern packaging with `uv`, console scripts (`imdb-*`), dependencies (`httpx[http2]`, `msgspec`), and dev tools (`pytest`, `ruff`, `mypy`).
 - `src/config.py`: Ingestion thresholds (`min_votes: 1000`, `min_year: 1900`), dataset URLs, enrichment settings.
 - `src/db.py`: SQLite schema, indexes, dynamic migrations, batch upserts, rank calculation, and connection manager.
@@ -21,7 +21,7 @@
 - `src/export.py`: Atomic exporter (`msgspec.json.encode`) generating compact columnar JSON (`data/titles.json`) and gzip (`data/titles.json.gz`).
 - `src/check_freshness.py`: Freshness checker detecting stale dataset for Tuesday retry.
 - `tests/test_pipeline.py`: Automated unit & regression test suite covering all pipeline components.
-- `data/`: Generated JSON dataset (`titles.json`, 16.88 MB; `titles.json.gz`, 4.53 MB, git-ignored, distributed via GitHub Releases).
+- `data/`: Generated JSON dataset (`titles.json`, 16.88 MB; `titles.json.gz`, 4.53 MB, git-ignored, distributed via GitHub Releases & GitHub Pages).
 - `imdb.db`: SQLite database holding 103,229 indexed titles (~31.6 MB, git-ignored, distributed via GitHub Releases).
 - `cache/`: Optional local `.tsv.gz` dumps (git-ignored).
 

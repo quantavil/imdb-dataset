@@ -9,30 +9,30 @@ A curated, noise-filtered, and pre-indexed IMDb dataset updated automatically ev
 
 ---
 
-## 🚀 Instant Dataset Downloads
+## 🚀 Instant Dataset Downloads & CORS Endpoints
 
-The following links are **static and permanent**. They are automatically overwritten in-place every week on Monday, so downstream applications can hardcode these URLs directly:
+The following links are **static and permanent**. They are automatically overwritten in-place every week on Monday, so downstream web apps and APIs can hardcode these URLs directly:
 
-| Asset | Format | Size | Description | Download Link |
+| Asset | Format | Size | Description | Download / Fetch URL |
 | :--- | :--- | :--- | :--- | :--- |
-| **`titles.json.gz`** | Compressed JSON | **~4.5 MB** | **Recommended for Web & APIs.** Pre-compressed compact columnar format. | [Download `titles.json.gz`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz) |
-| **`titles.json`** | Raw JSON | **~16.9 MB** | Uncompressed columnar JSON dataset for instant browser parsing. | [Download `titles.json`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json) |
+| **`titles.json.gz` (CORS)** | Compressed JSON | **~4.5 MB** | **Recommended for Web & APIs.** GitHub Pages endpoint with native `Access-Control-Allow-Origin: *`. | [Download / Fetch `titles.json.gz`](https://quantavil.github.io/imdb-dataset/titles.json.gz) |
+| **`titles.json` (CORS)** | Raw JSON | **~16.9 MB** | Uncompressed columnar JSON dataset for instant browser parsing. | [Download / Fetch `titles.json`](https://quantavil.github.io/imdb-dataset/titles.json) |
 | **`imdb.db`** | SQLite 3 | **~31.6 MB** | Fully indexed relational database with pre-computed rankings. | [Download `imdb.db`](https://github.com/quantavil/imdb-dataset/releases/download/latest/imdb.db) |
 
 > [!TIP]
-> **Production Recommendation:** Use `titles.json.gz` in web applications. Modern browsers decompress it transparently in under 30ms with minimal bandwidth consumption.
+> **Production Web Recommendation:** Use the GitHub Pages URL (`https://quantavil.github.io/imdb-dataset/titles.json.gz`) in client-side web applications. It serves native CORS headers and allows browsers to stream and decompress in under 30ms.
 
 ---
 
 ## 💡 Quick Start: Consuming the Dataset
 
-### 1. JavaScript / TypeScript (Web Browser & Node.js)
+### 1. JavaScript / TypeScript (Web Browser & Node.js with CORS)
 
 ```javascript
 // Stream & decompress directly in modern browsers (or Node.js 18+)
 async function loadIMDbDataset() {
   const response = await fetch(
-    "https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz"
+    "https://quantavil.github.io/imdb-dataset/titles.json.gz"
   );
   const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
   const jsonText = await new Response(stream).text();

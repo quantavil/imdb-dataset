@@ -1,120 +1,105 @@
-# IMDb Data Pipeline & Leaderboard Engine
+# IMDb Clean Dataset & Weekly Data Pipeline
 
-Lightweight Python & SQLite pipeline that streams official IMDb daily dumps, enriches titles with live MOVIEMETER popularity and official posters, and exports compact columnar JSON for browser leaderboards.
+[![Dataset Refresh](https://github.com/quantavil/imdb-dataset/actions/workflows/update.yml/badge.svg)](https://github.com/quantavil/imdb-dataset/actions/workflows/update.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python)](https://www.python.org)
+[![Fast Package Manager: uv](https://img.shields.io/badge/Managed%20by-uv-DE5FE9?logo=astral)](https://docs.astral.sh/uv/)
 
----
-
-## Features
-
-- **In-Memory Streaming**: Streams official IMDb `.tsv.gz` dumps over HTTP or local cache, discarding sub-1,000 vote noise in flight (0 MB disk waste).
-- **Official Public Datasets**: Ingests `title.ratings`, `title.basics`, `title.crew` (directors/writers), and `title.episode` (season/episode mapping).
-- **Live Popularity & Posters**: Multithreaded enrichment via IMDb Suggestion CDN (`v3.sg.media-imdb.com`) with a 7-day TTL cache for weekly popularity ranks, top cast, and HD posters.
-- **Compact Columnar JSON & Gzip**: Exports `data/titles.json` (15.18 MB) and pre-compressed `data/titles.json.gz` (4.30 MB / 88,363 titles) with embedded summary stats.
+A curated, noise-filtered, and pre-indexed IMDb dataset updated automatically every week. Features continuous rankings, HD poster images, top cast, TV series/episode mappings, and live MOVIEMETER popularity.
 
 ---
 
-## Project Structure
+## 🚀 Instant Dataset Downloads
 
-```text
-imdb-dataset/
-├── data/                    # Generated JSON datasets (git-ignored, distributed via GitHub Releases)
-│   ├── titles.json          # Curated universe (Votes >= 1,000, 15.18 MB)
-│   └── titles.json.gz       # Pre-compressed gzip export (4.30 MB)
-├── imdb.db                  # Local SQLite database (git-ignored, ~26 MB)
-├── cache/                   # Optional local raw .tsv.gz dumps (git-ignored)
-├── pyproject.toml           # Project metadata, dependencies, and tool configs
-└── src/                     # Pipeline source code
-    ├── __init__.py          # Package initializer
-    ├── config.py            # Dataset URLs, thresholds, and filter settings
-    ├── db.py                # SQLite schema, indices, migrations, batch upserts, pruning
-    ├── ingest.py            # Stream filter for ratings, basics, episodes, crew
-    ├── enrich.py            # Multithreaded poster, cast, and popularity worker
-    ├── export.py            # Columnar JSON dataset exporter (atomic + gzip)
-    └── check_freshness.py   # Dataset staleness detector for CI skip and retry
+The following links are **static and permanent**. They are automatically overwritten in-place every week on Monday, so downstream applications can hardcode these URLs directly:
+
+| Asset | Format | Size | Description | Download Link |
+| :--- | :--- | :--- | :--- | :--- |
+| **`titles.json.gz`** | Compressed JSON | **~4.3 MB** | **Recommended for Web & APIs.** Pre-compressed compact columnar format. | [Download `titles.json.gz`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz) |
+| **`titles.json`** | Raw JSON | **~15.2 MB** | Uncompressed columnar JSON dataset for instant browser parsing. | [Download `titles.json`](https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json) |
+| **`imdb.db`** | SQLite 3 | **~26.0 MB** | Fully indexed relational database with pre-computed rankings. | [Download `imdb.db`](https://github.com/quantavil/imdb-dataset/releases/download/latest/imdb.db) |
+
+> [!TIP]
+> **Production Recommendation:** Use `titles.json.gz` in web applications. Modern browsers decompress it transparently in under 30ms with minimal bandwidth consumption.
+
+---
+
+## 💡 Quick Start: Consuming the Dataset
+
+### 1. JavaScript / TypeScript (Web Browser & Node.js)
+
+```javascript
+// Stream & decompress directly in modern browsers (or Node.js 18+)
+async function loadIMDbDataset() {
+  const response = await fetch(
+    "https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz"
+  );
+  const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+  const jsonText = await new Response(stream).text();
+  const dataset = JSON.parse(jsonText);
+
+  // Map array rows to objects using the fields header
+  const { fields, data } = dataset;
+  const titles = data.map((row) =>
+    Object.fromEntries(fields.map((field, i) => [field, row[i]]))
+  );
+
+  console.log(`Loaded ${titles.length} titles. Top title:`, titles[0].title);
+  return titles;
+}
+```
+
+### 2. Python (Pandas / JSON)
+
+```python
+import gzip
+import json
+import urllib.request
+
+url = "https://github.com/quantavil/imdb-dataset/releases/download/latest/titles.json.gz"
+req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+
+with urllib.request.urlopen(req) as resp, gzip.GzipFile(fileobj=resp) as gz:
+    payload = json.loads(gz.read().decode("utf-8"))
+
+fields = payload["fields"]
+titles = [dict(zip(fields, row)) for row in payload["data"]]
+print(f"Loaded {len(titles):,} titles. Top ranked: {titles[0]['title']} ({titles[0]['rating']}★)")
+```
+
+### 3. Python (SQLite Query)
+
+```python
+import sqlite3
+
+# Connect to downloaded imdb.db
+conn = sqlite3.connect("imdb.db")
+conn.row_factory = sqlite3.Row
+
+# Query top 10 animated movies released after 2010
+cursor = conn.execute("""
+    SELECT rank, title, year, rating, vote_count, poster_url
+    FROM titles
+    WHERE is_animation = 1 AND title_type = 'movie' AND year >= 2010
+    ORDER BY rank ASC
+    LIMIT 10;
+""")
+
+for row in cursor.fetchall():
+    print(f"#{row['rank']} {row['title']} ({row['year']}) - {row['rating']}★ ({row['vote_count']:,} votes)")
 ```
 
 ---
 
-## Database Summary (`imdb.db`)
+## 📊 Dataset Specifications & Schema
 
-* **Indexed Titles:** 88,363 (Filtered to `votes >= 1,000`, `year >= 1990`)
-  * **Movies:** 37,076
-  * **TV Episodes:** 35,666 (Linked with parent series, season, and episode number)
-  * **TV Series & Miniseries:** 11,766
-  * **Animation:** 13,193
-* **Size:** ~26 MB
+* **Curated Universe:** 88,000+ titles filtered to $\ge 1,000$ votes and release year $\ge 1990$.
+* **Breakdown:** ~37,000 Movies, ~11,700 TV Series/Miniseries, ~35,600 TV Episodes, and ~13,100 Animation titles.
+* **Deterministic Rank Order:** Sorted by `rating DESC`, `vote_count DESC`, `imdb_id ASC`.
 
-### Table Schema (`titles`)
+### JSON Columnar Layout (`titles.json`)
 
-| Column | Type | Description |
-| :--- | :--- | :--- |
-| `imdb_id` | `TEXT PRIMARY KEY` | IMDb identifier (e.g. `tt0903747`) |
-| `title` | `TEXT` | Primary title in English / Romanized script |
-| `original_title` | `TEXT` | Title in original release language |
-| `title_type` | `TEXT` | `movie`, `tv_series`, `tv_miniseries`, `tv_movie`, `tv_episode`, `short` |
-| `year` | `INTEGER` | Release year |
-| `end_year` | `INTEGER` | Series finale year (or `NULL`) |
-| `rating` | `REAL` | IMDb average rating (1.0 – 10.0) |
-| `vote_count` | `INTEGER` | Total user votes |
-| `runtime_minutes` | `INTEGER` | Runtime in minutes |
-| `genres` | `TEXT` | Comma-separated genres |
-| `is_adult` | `INTEGER` | `1` if adult content, `0` otherwise |
-| `is_animation` | `INTEGER` | `1` if animated production, `0` otherwise |
-| `poster_url` | `TEXT` | Official HD poster image URL |
-| `cast_members` | `TEXT` | Top starring cast members |
-| `directors` | `TEXT` | Primary director IDs (e.g. `nm0764527`) |
-| `writers` | `TEXT` | Primary writer IDs (e.g. `nm0001851`) |
-| `parent_id` | `TEXT` | Parent TV show IMDb ID (for episodes) |
-| `season_number` | `INTEGER` | Season number (for episodes) |
-| `episode_number` | `INTEGER` | Episode number (for episodes) |
-| `popularity_rank` | `INTEGER` | Live MOVIEMETER traffic rank |
-| `rank` | `INTEGER` | Overall leaderboard rank |
-| `updated_at` | `DATETIME` | Last sync timestamp |
-| `enriched_at` | `DATETIME` | Enrichment timestamp (refreshed via 7-day TTL) |
-
----
-
-## Quick Start
-
-### 1. Requirements & Setup
-
-This project uses [`uv`](https://docs.astral.sh/uv/) for blazing fast dependency management:
-
-```bash
-# Sync virtual environment and install all dependencies
-uv sync --all-extras
-```
-
-### 2. Run Pipeline
-
-```bash
-# Ingest all datasets (streams over HTTP by default, or point to local cache)
-uv run imdb-ingest
-
-# Optional: use local cached .tsv.gz files
-uv run imdb-ingest \
-  --ratings-file cache/title.ratings.tsv.gz \
-  --basics-file cache/title.basics.tsv.gz \
-  --crew-file cache/title.crew.tsv.gz \
-  --episodes-file cache/title.episode.tsv.gz
-
-# Enrich top titles with posters, cast & live popularity
-uv run imdb-enrich --limit 2000
-
-# Export compact JSON and gzip
-uv run imdb-export
-
-# Run test suite and linter
-uv run pytest
-uv run ruff check src tests
-uv run mypy src
-```
-
----
-
-## Exported JSON Format (`data/titles.json`)
-
-Compact array-of-arrays layout to minimize network transfer:
+To eliminate key repetition over 88,000 records, titles are exported in a compact array-of-arrays structure:
 
 ```json
 {
@@ -140,23 +125,96 @@ Compact array-of-arrays layout to minimize network transfer:
 }
 ```
 
+### Field Definitions
+
+| Index | Field | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `0` | `id` | `string` | IMDb identifier (e.g. `tt0903747`) |
+| `1` | `title` | `string` | Primary English / Romanized title |
+| `2` | `original_title` | `string` | Original language release title |
+| `3` | `type` | `string` | `movie`, `tv_series`, `tv_miniseries`, `tv_movie`, `tv_episode`, `short` |
+| `4` | `year` | `integer` | Release year |
+| `5` | `end_year` | `integer \| null` | Series finale year (or `null`) |
+| `6` | `rating` | `float` | IMDb weighted average rating (`1.0` – `10.0`) |
+| `7` | `votes` | `integer` | Total registered user votes |
+| `8` | `runtime` | `integer \| null` | Runtime duration in minutes |
+| `9` | `genres` | `string` | Comma-delimited list of genres |
+| `10` | `is_adult` | `0 \| 1` | `1` if categorized as adult content |
+| `11` | `is_animation` | `0 \| 1` | `1` if animated production |
+| `12` | `poster` | `string \| null` | High-resolution official poster image URL |
+| `13` | `cast` | `string \| null` | Top starring cast members |
+| `14` | `popularity` | `integer \| null` | Live IMDb MOVIEMETER traffic rank |
+| `15` | `rank` | `integer` | Continuous 1..N leaderboard rank |
+| `16` | `directors` | `string \| null` | Primary director IDs (e.g. `nm0764527`) |
+| `17` | `parent_id` | `string \| null` | Parent TV Series IMDb ID (for TV episodes) |
+| `18` | `season` | `integer \| null` | Season number (for TV episodes) |
+| `19` | `episode` | `integer \| null` | Episode number (for TV episodes) |
+
 ---
 
-## Automated Weekly Refresh (CI / GitHub Actions)
+## 🔄 Automated Weekly Update Schedule
 
-The repository includes a GitHub Actions workflow (`.github/workflows/update.yml`) configured for Monday runs and Tuesday retries:
-* **Schedule**: Triggers **only on Mondays & Tuesdays at 09:42 UTC** (`42 9 * * 1,2`). **Wed–Sun are completely silent (0 triggers).**
-* **Monday (Primary Run)**: Streams official daily dumps, enriches Monday MOVIEMETER popularity ranks, and publishes refreshed `titles.json`, `titles.json.gz`, and `imdb.db` directly to the permanent `latest` GitHub Release (zero Git repository bloat).
-* **Tuesday (Auto-Retry if Monday Failed)**: Wakes up on Tuesday:
-  * If Monday succeeded ($< 5$ days old) $\rightarrow$ **Skips immediately in 1 second**.
-  * If Monday failed $\rightarrow$ **Automatically runs, refreshes, and republishes the release**.
-* **Direct Static CDN Access**: Frontends can fetch the static URL directly:
-  `https://github.com/<owner>/<repo>/releases/download/latest/titles.json.gz`
-* **Manual Run**: Supports on-demand manual triggers via GitHub Actions `workflow_dispatch`.
+Updates run automatically via GitHub Actions ([`.github/workflows/update.yml`](file:///.github/workflows/update.yml)):
+
+* **Primary Run (Monday at 09:42 UTC):** Streams fresh daily dumps from `datasets.imdbws.com`, enriches Monday MOVIEMETER traffic ranks, rebuilds the database, and clobber-publishes assets to the `latest` GitHub Release tag.
+* **Auto-Retry (Tuesday at 09:42 UTC):** Checks dataset age; if Monday's run succeeded, it exits in 1 second. If Monday failed, it automatically runs the full update.
+* **Zero Downtime / Static URLs:** File URLs stay identical across all weekly updates.
 
 ---
 
-## License & Attribution
+## 🛠️ Pipeline Developer Guide
 
-- **Code:** [GPL-3.0](./LICENSE)
-- **Data Attribution:** Information and metadata courtesy of [IMDb](https://www.imdb.com). Used strictly for personal, research, and non-commercial educational purposes under [IMDb Non-Commercial Datasets Terms of Service](https://developer.imdb.com/non-commercial-datasets/).
+For developers contributing to or maintaining the ingestion and enrichment pipeline.
+
+### Project Structure
+
+```text
+imdb-dataset/
+├── data/                    # Generated exports (git-ignored, published to GitHub Releases)
+│   ├── titles.json          # Columnar JSON (15.2 MB)
+│   └── titles.json.gz       # Pre-compressed gzip export (4.3 MB)
+├── imdb.db                  # Local SQLite database (git-ignored, ~26 MB)
+├── cache/                   # Optional local raw .tsv.gz dumps (git-ignored)
+├── pyproject.toml           # Project metadata, dependencies, and tool configs
+├── src/                     # Core pipeline source code
+│   ├── config.py            # Thresholds, URLs, and filter parameters
+│   ├── db.py                # SQLite schema, indices, migrations, batch upserts, pruning
+│   ├── ingest.py            # In-memory stream filtering (ratings, basics, crew, episodes)
+│   ├── enrich.py            # Multithreaded HTTP/2 worker for posters, cast, and popularity
+│   ├── export.py            # Atomic columnar JSON & gzip exporter
+│   └── check_freshness.py   # Dataset staleness detector for CI skip/retry
+└── tests/                   # Automated unit & regression test suite
+```
+
+### Local Setup & Execution
+
+1. **Install [`uv`](https://docs.astral.sh/uv/) and sync dependencies:**
+   ```bash
+   uv sync --all-extras
+   ```
+
+2. **Run Pipeline Stages:**
+   ```bash
+   # 1. Ingest official dumps (streams directly over HTTP, 0 MB disk waste)
+   uv run imdb-ingest
+
+   # 2. Enrich top titles with posters, cast & live popularity (7-day TTL cache)
+   uv run imdb-enrich --limit 2000
+
+   # 3. Export compact columnar JSON and pre-compressed gzip
+   uv run imdb-export
+   ```
+
+3. **Run Tests & Code Quality:**
+   ```bash
+   uv run pytest
+   uv run ruff check src tests
+   uv run mypy src
+   ```
+
+---
+
+## ⚖️ License & Attribution
+
+* **Pipeline Code:** [GPL-3.0 License](./LICENSE)
+* **Data Attribution:** Movie and television metadata courtesy of [IMDb](https://www.imdb.com). Used strictly for personal, research, and non-commercial educational purposes under the [IMDb Non-Commercial Datasets Terms of Service](https://developer.imdb.com/non-commercial-datasets/).

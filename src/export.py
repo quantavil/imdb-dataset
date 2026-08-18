@@ -56,7 +56,7 @@ def build_tier_payload(conn: sqlite3.Connection, min_votes: int) -> Dict[str, An
             imdb_id, title, original_title, title_type,
             year, end_year, rating, vote_count, runtime_minutes,
             genres, is_adult, is_animation, poster_url, cast_members,
-            popularity_rank, directors, parent_id, season_number, episode_number
+            popularity_rank, parent_id, season_number, episode_number
         FROM titles
         WHERE vote_count >= ?
         ORDER BY rating DESC, vote_count DESC, imdb_id ASC;
@@ -82,7 +82,6 @@ def build_tier_payload(conn: sqlite3.Connection, min_votes: int) -> Dict[str, An
         "cast",
         "popularity",
         "rank",
-        "directors",
         "parent_id",
         "season",
         "episode",
@@ -106,7 +105,6 @@ def build_tier_payload(conn: sqlite3.Connection, min_votes: int) -> Dict[str, An
             r["cast_members"],
             r["popularity_rank"],
             idx + 1,  # Continuous 1..N tier ranking for seamless frontend filtering
-            r["directors"],
             r["parent_id"],
             r["season_number"],
             r["episode_number"],

@@ -233,27 +233,6 @@ def get_titles_needing_enrichment(
         return results
 
 
-def update_crew_batch(
-    updates: List[Tuple[str, Optional[str], Optional[str]]], db_path: Union[str, Path] = DB_PATH
-):
-    """
-    Batched update of directors and writers.
-    Tuple structure: (imdb_id, directors, writers)
-    """
-    if not updates:
-        return
-    reordered = [(directors, writers, imdb_id) for imdb_id, directors, writers in updates]
-    with open_db(db_path) as conn:
-        conn.executemany(
-            """
-        UPDATE titles
-        SET directors = ?,
-            writers = ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE imdb_id = ?;
-        """,
-            reordered,
-        )
 
 
 def update_episodes_batch(

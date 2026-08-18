@@ -20,7 +20,6 @@ try:
         upsert_titles_batch,
         prune_unqualified_titles,
         recalculate_ranks,
-        update_crew_batch,
         update_episodes_batch,
     )
 except ImportError:
@@ -30,7 +29,6 @@ except ImportError:
         upsert_titles_batch,
         prune_unqualified_titles,
         recalculate_ranks,
-        update_crew_batch,
         update_episodes_batch,
     )
 
@@ -249,60 +247,9 @@ def stream_and_update_episodes(
     )
 
 
-def stream_and_update_crew(
-    qualifying_ids: Union[Dict[str, Any], Set[str]],
-    crew_source: Optional[str] = None,
-    batch_size: int = 2500,
-    db_path: Union[str, Path] = DB_PATH,
-):
-    """
-    Streams title.crew.tsv.gz, extracts director & writer IDs for qualifying titles,
-    and updates titles in SQLite.
-    """
-    crew_url_or_path = crew_source or URLS["crew"]
-    t0 = time.time()
-    batch = []
-    updated_count = 0
-
-    with open_dataset_stream(crew_url_or_path) as resp:
-        with gzip.GzipFile(fileobj=resp) as gz:
-            reader = csv.reader(io.TextIOWrapper(gz, encoding="utf-8"), delimiter="\t")
-            _header = next(reader, None)  # tconst, directors, writers
-
-            for row in reader:
-                if len(row) < 3:
-                    continue
-                tconst = row[0]
-                if tconst not in qualifying_ids:
-                    continue
-
-                directors_raw = (
-                    row[1].replace(",", ", ") if row[1] and row[1] != "\\N" else None
-                )
-                writers_raw = (
-                    row[2].replace(",", ", ") if row[2] and row[2] != "\\N" else None
-                )
-
-                batch.append((tconst, directors_raw, writers_raw))
-                if len(batch) >= batch_size:
-                    update_crew_batch(batch, db_path=db_path)
-                    updated_count += len(batch)
-                    batch.clear()
-
-            if batch:
-                update_crew_batch(batch, db_path=db_path)
-                updated_count += len(batch)
-                batch.clear()
-
-    print(
-        f"[+] Successfully updated crew info for {updated_count:,} titles in {time.time() - t0:.2f}s"
-    )
-
-
 def run_ingestion(
     ratings_file: Optional[str] = None,
     basics_file: Optional[str] = None,
-    crew_file: Optional[str] = None,
     episodes_file: Optional[str] = None,
     db_path: Union[str, Path] = DB_PATH,
 ):
@@ -323,7 +270,6 @@ def run_ingestion(
         if pruned:
             print(f"[*] Removed {pruned:,} titles that no longer meet filters")
     stream_and_update_episodes(inserted_ids, source=episodes_file, db_path=db_path)
-    stream_and_update_crew(inserted_ids, crew_source=crew_file, db_path=db_path)
 
     print("[*] Calculating overall leaderboard ranking...")
     recalculate_ranks(db_path=db_path)
@@ -341,9 +287,6 @@ def main():
         "--basics-file", type=str, default=None, help="Optional path to local title.basics.tsv.gz"
     )
     parser.add_argument(
-        "--crew-file", type=str, default=None, help="Optional path to local title.crew.tsv.gz"
-    )
-    parser.add_argument(
         "--episodes-file",
         type=str,
         default=None,
@@ -355,7 +298,6 @@ def main():
     run_ingestion(
         ratings_file=args.ratings_file,
         basics_file=args.basics_file,
-        crew_file=args.crew_file,
         episodes_file=args.episodes_file,
         db_path=args.db_path,
     )

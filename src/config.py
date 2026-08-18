@@ -14,7 +14,6 @@ DB_PATH = BASE_DIR / "imdb.db"
 URLS = {
     "ratings": "https://datasets.imdbws.com/title.ratings.tsv.gz",
     "basics": "https://datasets.imdbws.com/title.basics.tsv.gz",
-    "crew": "https://datasets.imdbws.com/title.crew.tsv.gz",
     "episodes": "https://datasets.imdbws.com/title.episode.tsv.gz",
     "suggestion_base": "https://v3.sg.media-imdb.com/suggestion/x/{id}.json",
 }

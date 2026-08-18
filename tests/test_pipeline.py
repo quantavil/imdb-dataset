@@ -13,7 +13,6 @@ from db import (
     open_db,
     prune_unqualified_titles,
     recalculate_ranks,
-    update_crew_batch,
     update_enrichment_batch,
     get_titles_needing_enrichment,
     update_episodes_batch,
@@ -25,7 +24,6 @@ from ingest import (
     fetch_qualifying_ratings,
     run_ingestion,
     stream_and_insert_basics,
-    stream_and_update_crew,
     stream_and_update_episodes,
 )
 
@@ -343,7 +341,6 @@ def test_export_tier_continuous_rank(temp_db):
     upsert_titles_batch(sample_rows, db_path=temp_db)
     recalculate_ranks(db_path=temp_db)
 
-    update_crew_batch([("tt003", "nm001, nm002", "nm003")], db_path=temp_db)
     update_episodes_batch([("tt003", "ttParentSeries", 2, 5)], db_path=temp_db)
 
     with open_db(temp_db) as conn:
@@ -352,15 +349,14 @@ def test_export_tier_continuous_rank(temp_db):
         assert payload_1k["stats"]["total_episodes"] == 1
         assert payload_1k["stats"]["total_animation"] == 1
         assert "is_animation" in payload_1k["fields"]
-        assert "directors" in payload_1k["fields"]
+        assert "directors" not in payload_1k["fields"]
         assert "parent_id" in payload_1k["fields"]
 
         row_003 = next(r for r in payload_1k["data"] if r[0] == "tt003")
         assert row_003[11] == 1  # is_animation
-        assert row_003[16] == "nm001, nm002"
-        assert row_003[17] == "ttParentSeries"
-        assert row_003[18] == 2
-        assert row_003[19] == 5
+        assert row_003[16] == "ttParentSeries"
+        assert row_003[17] == 2
+        assert row_003[18] == 5
 
 
 def test_export_dataset_full_and_gzip(temp_db, tmp_path):
@@ -573,60 +569,19 @@ def test_reingest_drops_title_below_vote_threshold(temp_db, tmp_path):
         )
 
     episodes_gz = tmp_path / "title.episode.tsv.gz"
-    crew_gz = tmp_path / "title.crew.tsv.gz"
     with gzip.open(episodes_gz, "wt", encoding="utf-8") as f:
         f.write("tconst\tparentTconst\tseasonNumber\tepisodeNumber\n")
-    with gzip.open(crew_gz, "wt", encoding="utf-8") as f:
-        f.write("tconst\tdirectors\twriters\n")
 
     run_ingestion(
         ratings_file=str(ratings_gz),
         basics_file=str(basics_gz),
         episodes_file=str(episodes_gz),
-        crew_file=str(crew_gz),
         db_path=temp_db,
     )
 
     with open_db(temp_db) as conn:
         ids = {row["imdb_id"] for row in conn.execute("SELECT imdb_id FROM titles")}
         assert ids == {"ttstay1"}
-
-
-def test_crew_backslash_n_clears_stale_directors(temp_db, tmp_path):
-    """A later crew dump with \\N must null out previously stored directors."""
-    upsert_titles_batch(
-        [
-            (
-                "tt5002",
-                "Inception",
-                "Inception",
-                "movie",
-                2010,
-                None,
-                8.8,
-                2500000,
-                148,
-                "Action",
-                0,
-                0,
-            )
-        ],
-        db_path=temp_db,
-    )
-    update_crew_batch([("tt5002", "nm0634240", "nm0634240")], db_path=temp_db)
-
-    crew_gz = tmp_path / "title.crew.tsv.gz"
-    with gzip.open(crew_gz, "wt", encoding="utf-8") as f:
-        f.write("tconst\tdirectors\twriters\ntt5002\t\\N\t\\N\n")
-
-    stream_and_update_crew({"tt5002"}, crew_source=str(crew_gz), db_path=temp_db)
-
-    with open_db(temp_db) as conn:
-        row = conn.execute(
-            "SELECT directors, writers FROM titles WHERE imdb_id = 'tt5002'"
-        ).fetchone()
-        assert row["directors"] is None
-        assert row["writers"] is None
 
 
 def test_init_db_rebuilds_rating_index_with_imdb_id(tmp_path):
@@ -701,26 +656,13 @@ def test_episode_and_crew_ingestion_without_names(temp_db, tmp_path):
 
     stream_and_update_episodes(qualifying, source=str(episodes_gz), db_path=temp_db)
 
-    crew_gz = tmp_path / "title.crew.tsv.gz"
-    crew_content = (
-        "tconst\tdirectors\twriters\ntt5001\tnm0425005\tnm0905154\ntt5002\tnm0634240\tnm0634240\n"
-    )
-    with gzip.open(crew_gz, "wt", encoding="utf-8") as f:
-        f.write(crew_content)
-
-    stream_and_update_crew(qualifying, crew_source=str(crew_gz), db_path=temp_db)
-
     with open_db(temp_db) as conn:
         row_ep = conn.execute("SELECT * FROM titles WHERE imdb_id = 'tt5001'").fetchone()
         assert row_ep["parent_id"] == "tt0903747"
         assert row_ep["season_number"] == 5
         assert row_ep["episode_number"] == 14
-        assert row_ep["directors"] == "nm0425005"
-        assert row_ep["writers"] == "nm0905154"
 
         row_mov = conn.execute("SELECT * FROM titles WHERE imdb_id = 'tt5002'").fetchone()
-        assert row_mov["directors"] == "nm0634240"
-        assert row_mov["writers"] == "nm0634240"
         assert row_mov["parent_id"] is None
 
 

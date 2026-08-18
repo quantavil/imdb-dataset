@@ -65,7 +65,7 @@ jobs:
 
       - name: Enrich top titles with posters, cast & popularity
         if: steps.freshness.outputs.should_run == 'true'
-        run: uv run src/enrich.py --limit 2000
+        run: uv run src/enrich.py --limit 5000
 
       - name: Export compact JSON
         if: steps.freshness.outputs.should_run == 'true'

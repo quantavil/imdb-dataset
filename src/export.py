@@ -53,13 +53,16 @@ def build_tier_payload(conn: sqlite3.Connection, min_votes: int) -> Dict[str, An
     cursor = conn.execute(
         """
         SELECT
-            imdb_id, title, original_title, title_type,
-            year, end_year, rating, vote_count, runtime_minutes,
-            genres, is_adult, is_animation, poster_url, cast_members,
-            popularity_rank, parent_id, season_number, episode_number
-        FROM titles
-        WHERE vote_count >= ?
-        ORDER BY rating DESC, vote_count DESC, imdb_id ASC;
+            t.imdb_id, t.title, t.original_title, t.title_type,
+            t.year, t.end_year, t.rating, t.vote_count, t.runtime_minutes,
+            t.genres, t.is_adult, t.is_animation,
+            COALESCE(t.poster_url, p.poster_url) AS poster_url,
+            COALESCE(t.cast_members, p.cast_members) AS cast_members,
+            t.popularity_rank, t.parent_id, t.season_number, t.episode_number
+        FROM titles t
+        LEFT JOIN titles p ON t.parent_id = p.imdb_id
+        WHERE t.vote_count >= ?
+        ORDER BY t.rating DESC, t.vote_count DESC, t.imdb_id ASC;
     """,
         (min_votes,),
     )

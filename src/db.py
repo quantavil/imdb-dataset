@@ -206,7 +206,7 @@ def get_titles_needing_enrichment(
     exclude_ids: Optional[Union[set, list]] = None,
     db_path: Union[str, Path] = DB_PATH,
 ) -> List[sqlite3.Row]:
-    """Fetches titles where enriched_at IS NULL or older than 7 days TTL, ordered by leaderboard rank."""
+    """Fetches titles where enriched_at IS NULL or older than 7 days TTL, prioritizing movies & series by vote count."""
     exclude_set = set(exclude_ids) if exclude_ids else None
     with open_db(db_path) as conn:
         # Fetch candidate rows and filter in Python to avoid SQLite parameter limits on large exclude_ids
@@ -216,7 +216,10 @@ def get_titles_needing_enrichment(
             SELECT imdb_id
             FROM titles
             WHERE enriched_at IS NULL OR enriched_at < datetime('now', '-7 days')
-            ORDER BY rank ASC
+            ORDER BY 
+                CASE WHEN title_type IN ('movie', 'tv_series', 'tv_miniseries', 'tv_movie') THEN 0 ELSE 1 END ASC,
+                vote_count DESC,
+                rank ASC
             LIMIT ?;
             """,
             (fetch_limit,),
